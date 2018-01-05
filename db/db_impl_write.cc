@@ -7,6 +7,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file. See the AUTHORS file for names of contributors.
 #include "db/db_impl.h"
+#include <iostream>
 
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
@@ -16,11 +17,11 @@
 #include "monitoring/perf_context_imp.h"
 #include "options/options_helper.h"
 #include "util/sync_point.h"
-
 namespace rocksdb {
 // Convenience methods
 Status DBImpl::Put(const WriteOptions& o, ColumnFamilyHandle* column_family,
                    const Slice& key, const Slice& val) {
+  // std::cout << "here!" << std::endl;
   return DB::Put(o, column_family, key, val);
 }
 
@@ -46,6 +47,7 @@ Status DBImpl::SingleDelete(const WriteOptions& write_options,
 }
 
 Status DBImpl::Write(const WriteOptions& write_options, WriteBatch* my_batch) {
+  // std::cout << "write here..." << std::endl;
   return WriteImpl(write_options, my_batch, nullptr, nullptr);
 }
 
@@ -61,6 +63,8 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
                          WriteBatch* my_batch, WriteCallback* callback,
                          uint64_t* log_used, uint64_t log_ref,
                          bool disable_memtable, uint64_t* seq_used) {
+  // std::cout << "write impl: is wal disabled? : " << write_options.disableWAL << std::endl;
+  std::cout << "write impl!" << std::endl;
   if (my_batch == nullptr) {
     return Status::Corruption("Batch is nullptr!");
   }
@@ -109,10 +113,12 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
 
   write_thread_.JoinBatchGroup(&w);
   if (w.state == WriteThread::STATE_PARALLEL_MEMTABLE_WRITER) {
+    std::cout << "line 116" << std::endl;
     // we are a non-leader in a parallel group
     PERF_TIMER_GUARD(write_memtable_time);
 
     if (w.ShouldWriteToMemtable()) {
+      std::cout << "should write to memtable" << std::endl;
       ColumnFamilyMemTablesImpl column_family_memtables(
           versions_->GetColumnFamilySet());
       w.status = WriteBatchInternal::InsertInto(
@@ -122,6 +128,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     }
 
     if (write_thread_.CompleteParallelMemTableWriter(&w)) {
+      std::cout << "line 131" << std::endl;
       // we're responsible for exit batch group
       auto last_sequence = w.write_group->last_sequence;
       versions_->SetLastSequence(last_sequence);
@@ -130,10 +137,12 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
     }
     assert(w.state == WriteThread::STATE_COMPLETED);
     // STATE_COMPLETED conditional below handles exit
-
+    std::cout << "line 140" << std::endl;
     status = w.FinalStatus();
   }
+  std::cout << "line 143" << std::endl;
   if (w.state == WriteThread::STATE_COMPLETED) {
+    std::cout << "line 144" << std::endl;
     if (log_used != nullptr) {
       *log_used = w.log_used;
     }
@@ -239,12 +248,14 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
 
     if (!concurrent_prepare_) {
       if (status.ok() && !write_options.disableWAL) {
+        // std::cout << "write to wal" << std::endl;
         PERF_TIMER_GUARD(write_wal_time);
         status = WriteToWAL(write_group, log_writer, log_used, need_log_sync,
                             need_log_dir_sync, last_sequence + 1);
       }
     } else {
       if (status.ok() && !write_options.disableWAL) {
+        // std::cout << "concurrent write to wal" << std::endl;
         PERF_TIMER_GUARD(write_wal_time);
         // LastToBeWrittenSequence is increased inside WriteToWAL under
         // wal_write_mutex_ to ensure ordered events in WAL
@@ -263,11 +274,13 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
       PERF_TIMER_GUARD(write_memtable_time);
 
       if (!parallel) {
+        std::cout << "not parallel writing" << std::endl;
         w.status = WriteBatchInternal::InsertInto(
             write_group, current_sequence, column_family_memtables_.get(),
             &flush_scheduler_, write_options.ignore_missing_column_families,
             0 /*recovery_log_number*/, this, parallel, seq_per_batch_);
       } else {
+        std::cout << "parallel writing" << std::endl;
         SequenceNumber next_sequence = current_sequence;
         for (auto* writer : write_group) {
           writer->sequence = next_sequence;
@@ -286,6 +299,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
         // Each parallel follower is doing each own writes. The leader should
         // also do its own.
         if (w.ShouldWriteToMemtable()) {
+          std::cout << "line 302, should write to memtable" << std::endl;
           ColumnFamilyMemTablesImpl column_family_memtables(
               versions_->GetColumnFamilySet());
           assert(w.sequence == current_sequence);
@@ -295,6 +309,7 @@ Status DBImpl::WriteImpl(const WriteOptions& write_options,
               this, true /*concurrent_memtable_writes*/, seq_per_batch_);
         }
       }
+      std::cout << "w sequence = " << w.sequence << std::endl;
       if (seq_used != nullptr) {
         *seq_used = w.sequence;
       }
@@ -1297,6 +1312,7 @@ Status DB::Put(const WriteOptions& opt, ColumnFamilyHandle* column_family,
   // Pre-allocate size of write batch conservatively.
   // 8 bytes are taken by header, 4 bytes for count, 1 byte for type,
   // and we allocate 11 extra bytes for key length, as well as value length.
+  // std::cout << "key size = " << key.size() << ", value size = " << value.size() << std::endl;
   WriteBatch batch(key.size() + value.size() + 24);
   batch.Put(column_family, key, value);
   return Write(opt, &batch);
