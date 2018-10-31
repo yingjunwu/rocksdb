@@ -7,19 +7,9 @@
 #include "fast_random.h"
 
 
+std::string kDBPath = "/tmp/ts_example";
+
 using namespace rocksdb;
-
-// static std::string ColumnFamilyName(size_t i) {
-//   if (i == 0) {
-//     return rocksdb::kDefaultColumnFamilyName;
-//   } else {
-//     char name[100];
-//     snprintf(name, sizeof(name), "column_family_name_%06zu", i);
-//     return std::string(name);
-//   }
-// }
-
-
 
 Slice AllocateKey(std::unique_ptr<const char[]>* key_guard, const uint64_t key_size) {
   char* data = new char[key_size];
@@ -28,9 +18,12 @@ Slice AllocateKey(std::unique_ptr<const char[]>* key_guard, const uint64_t key_s
   return Slice(key_guard->get(), key_size);
 }
 
-std::string kDBPath = "/tmp/ts_example";
+enum class KeyGenerateType {
+  Random = 0,
+  Increment,
+};
 
-int main() {
+void execute() {
   FastRandom fast_rand;
 
   Options options;
@@ -81,12 +74,12 @@ int main() {
     
     std::cout << "value = " << *((const uint64_t*)(ret_value.c_str())) << std::endl;
   }
-
-  // std::string value;
-  // s = db->Get(read_options, "mykey", &value);
-
-
+  
   // close DB
-  // delete cf;
   delete db;
+
+}
+
+int main() {
+  execute();
 }
