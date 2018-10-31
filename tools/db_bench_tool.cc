@@ -5617,10 +5617,13 @@ void VerifyDBFromDB(std::string& truth_db_name) {
 
   void TimeSeries(ThreadState* thread) {
     if (thread->tid > 0) {
+        std::cout << "thread tid = " << thread->tid << std::endl;
       bool do_deletion = FLAGS_expire_style == "delete" &&
                          thread->tid <= FLAGS_num_deletion_threads;
+        std::cout << "do deletion = " << do_deletion << std::endl;
       TimeSeriesReadOrDelete(thread, do_deletion);
     } else {
+        std::cout << "this is writer..." << thread->tid << std::endl;
       TimeSeriesWrite(thread);
       thread->stats.Stop();
       thread->stats.Report("timeseries write");

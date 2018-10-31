@@ -1,0 +1,1 @@
+./db_bench --benchmarks=fillrandom,stats,readrandom,stats --num=10000000 --value_size=1024 --db=/ssd0/ --use_existing_db=0
